@@ -7,7 +7,11 @@ is not scored, but your Track Mentor reads it and the W8 defence can ask about i
 ## Tools
 
 <!-- Which tools you used (ChatGPT, Copilot, Claude, Cursor, none...) and for which parts. -->
-claude
+claude 
+
+parts:
+In APIError class, Exception handler, fields beside endpoints like operation_id and responses, and storing parcels in dictionary
+and nonlocal counter to be used inside functions. All of this was inside api.py .
 
 ## What AI got wrong
 
