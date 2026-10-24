@@ -20,12 +20,12 @@ class EventIn(BaseModel):
     type: EventType
 
 class APIError(Exception):
-    def __init__(self, type,status, title,errors=None, detail=None):
-        self.type,self.status, self.title,self.errors, self.detail = type,status, title,errors, detail
+    def __init__(self,status, title,errors=None, detail=None):
+        self.status, self.title,self.errors, self.detail = status, title,errors, detail
 
 
-def problem(type,status, title, detail=None,errors=None, **extra):
-    body = {"type": type, "title": title, "status": status, **extra}
+def problem(status, title, detail=None,errors=None, **extra):
+    body = {"type": "about:blank", "title": title, "status": status, **extra}
     if detail:
         body["detail"] = detail
     if errors:
@@ -48,14 +48,14 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(APIError) # for My own Errors
     async def on_api_error(request, exc: APIError):
-        return problem(exc.type,exc.status, exc.title, exc.detail,exc.errors)
+        return problem(exc.status, exc.title, exc.detail, exc.errors)
     
     @app.exception_handler(RequestValidationError)# for validation Errors raised by FastAPI
     async def on_validation(request, exc: RequestValidationError):
         by_loc = {}
         for e in exc.errors():
             by_loc[tuple(e["loc"])]= {"loc": e["loc"], "msg": e["msg"]}   # one entry per field
-        return problem('Validation Error',422, "Invalid body", errors=list(by_loc.values()))
+        return problem(422, "Validation Error", "Invalid body", errors=list(by_loc.values()))
 
 
 
@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
     def create_parcel(body:parcel_validator,response:Response):
         nonlocal counter
         if any(item.merchant_ref == body.merchant_ref for item in store.values()):
-            raise APIError('Uniqueness Error',409,'Duplicate merchant_ref')
+            raise APIError(409,'Duplicate merchant_ref')
         
         parcel_id:str=f"pcl_{counter}"
         counter+=1
@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
         if parcel_id in store:
             return store[parcel_id]
 
-        raise APIError('Not Found',404,f"Not found parcel with id {parcel_id}")
+        raise APIError(404, f"Not found parcel with id {parcel_id}")
 
 
 
@@ -125,13 +125,13 @@ def create_app() -> FastAPI:
                             "msg": "state must be one of: " + ", ".join(s.value for s in ParcelState)})
 
         if errors:
-            raise APIError('Value Error', 422, "bad state or limit", errors=errors)
+            raise APIError(422, "bad state or limit", errors=errors)
 
         
         start = 0
         if "cursor" in q:
             if q["cursor"] not in issued:
-                raise APIError('Bad Request', 400, "bad cursor")
+                raise APIError(400, "bad cursor")
             start = order.index(q["cursor"])+1
 
 
@@ -166,9 +166,9 @@ def create_app() -> FastAPI:
                 store[parcel_id] = p
                 return p
         except InvalidTransition:
-                raise APIError('Value Error',409,f"Invalid transition (parcel unchanged)")
+                raise APIError(409, f"Invalid transition (parcel unchanged)")
 
-        raise APIError('Not Found',404,f"Not found parcel with id {parcel_id}")
+        raise APIError(404, f"Not found parcel with id {parcel_id}")
         
     return app
     
