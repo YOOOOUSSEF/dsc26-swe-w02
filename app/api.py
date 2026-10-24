@@ -39,7 +39,9 @@ def create_app() -> FastAPI:
     (no module-level dicts or counters for parcels).
     """
 
-    store_list: list[Parcel]=[]
+    store: dict[str, Parcel] = {}
+    order: list[str] = []               # ids in creation order
+
     issued: set[str] = set()
     counter=0
     app=FastAPI(title="Tawseel parcel service", version="0.1.0")
@@ -65,7 +67,7 @@ def create_app() -> FastAPI:
           },response_model=Parcel)
     def create_parcel(body:parcel_validator,response:Response):
         nonlocal counter
-        if any(item.merchant_ref == body.merchant_ref for item in store_list):
+        if any(item.merchant_ref == body.merchant_ref for item in store.values()):
             raise APIError('Uniqueness Error',409,'Duplicate merchant_ref')
         
         parcel_id:str=f"pcl_{counter}"
@@ -73,7 +75,9 @@ def create_app() -> FastAPI:
 
         p = Parcel(id=parcel_id,merchant_ref=body.merchant_ref,cod_amount_piastres=body.cod_amount_piastres,
         address_text=body.address_text)
-        store_list.append(p)
+        store[parcel_id]=p
+        order.append(parcel_id)
+
 
         response.headers['Location']=f"/v1/parcels/{parcel_id}"
         return p
@@ -84,9 +88,8 @@ def create_app() -> FastAPI:
         404:{'description':'Not found Parcel with this Id','content':{'application/problem+json':{}}}
     },response_model=Parcel)
     def get_parcel(parcel_id:str):
-        for item in store_list:
-            if parcel_id == item.id:
-                return item
+        if parcel_id in store:
+            return store[parcel_id]
 
         raise APIError('Not Found',404,f"Not found parcel with id {parcel_id}")
 
@@ -125,19 +128,20 @@ def create_app() -> FastAPI:
             raise APIError('Value Error', 422, "bad state or limit", errors=errors)
 
         
-        last_seq_int = -1
+        start = 0
         if "cursor" in q:
             if q["cursor"] not in issued:
                 raise APIError('Bad Request', 400, "bad cursor")
-            last_seq_int = int(q['cursor'])
+            start = order.index(q["cursor"])+1
 
 
         parcels = []
         next_cursor=None
-        for item in store_list[last_seq_int+1:]:
+        for pid in order[start:]:
+            item = store[pid]
             if (state is None or state == item.state):
                 if(len(parcels)==limit):
-                    next_cursor=parcels[-1].id.split('_')[1]
+                    next_cursor=parcels[-1].id
                     issued.add(next_cursor)
                     break
                 parcels.append(item)
@@ -156,11 +160,11 @@ def create_app() -> FastAPI:
           })
     def record_parcel_event(parcel_id:str,body:EventIn):
         try:
-            for i,item in enumerate(store_list):
-                if parcel_id == item.id:
-                    p = apply_event(item, body.type)
-                    store_list[i] = p
-                    return p
+            parcel=store.get(parcel_id)
+            if parcel is not None:
+                p = apply_event(parcel, body.type)
+                store[parcel_id] = p
+                return p
         except InvalidTransition:
                 raise APIError('Value Error',409,f"Invalid transition (parcel unchanged)")
 
