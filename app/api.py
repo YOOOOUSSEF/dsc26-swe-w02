@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
 
     store_list: list[Parcel]=[]
     issued: set[str] = set()
+    counter=0
     app=FastAPI(title="Tawseel parcel service", version="0.1.0")
 
     @app.exception_handler(APIError) # for My own Errors
@@ -63,10 +64,12 @@ def create_app() -> FastAPI:
               422: {"description": "Invalid body", "content": {"application/problem+json": {}}},
           },response_model=Parcel)
     def create_parcel(body:parcel_validator,response:Response):
+        nonlocal counter
         if any(item.merchant_ref == body.merchant_ref for item in store_list):
             raise APIError('Uniqueness Error',409,'Duplicate merchant_ref')
         
-        parcel_id:str=f"pcl_{len(store_list)}"
+        parcel_id:str=f"pcl_{counter}"
+        counter+=1
 
         p = Parcel(id=parcel_id,merchant_ref=body.merchant_ref,cod_amount_piastres=body.cod_amount_piastres,
         address_text=body.address_text)

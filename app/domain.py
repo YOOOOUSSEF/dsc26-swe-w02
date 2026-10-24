@@ -48,16 +48,16 @@ def apply_event(parcel: Parcel, event: EventType) -> Parcel:
     - delivered and returned are final; every other combination raises InvalidTransition.
     Never mutate the input parcel.
     """
-    if parcel.state == 'created' and event=='dispatch':#create new parcel Because frozen(make object fields not reassignable)
-        return replace(parcel, attempts=parcel.attempts + 1,state=ParcelState.OUT_FOR_DELIVERY)  
-    elif parcel.state == 'out_for_delivery' and event=='deliver':
-        return replace(parcel,state=ParcelState.DELIVERED)
-    elif parcel.state == 'out_for_delivery' and event=='fail':
-        return replace(parcel,state=ParcelState.FAILED_ATTEMPT)
-    elif parcel.state == 'failed_attempt' and event=='dispatch' and parcel.attempts<MAX_ATTEMPTS:
-        return replace(parcel, attempts=parcel.attempts + 1,state=ParcelState.OUT_FOR_DELIVERY)
-    elif parcel.state == 'failed_attempt' and event=='return':
-        return replace(parcel,state=ParcelState.RETURNED)
+    if parcel.state == ParcelState.CREATED and event==EventType.DISPATCH :#create new parcel Because frozen(make object fields not reassignable)
+        return replace(parcel, attempts=parcel.attempts + 1, state=ParcelState.OUT_FOR_DELIVERY)
+    elif parcel.state == ParcelState.OUT_FOR_DELIVERY and event == EventType.DELIVER:
+        return replace(parcel, state=ParcelState.DELIVERED)
+    elif parcel.state == ParcelState.OUT_FOR_DELIVERY and event == EventType.FAIL:
+        return replace(parcel, state=ParcelState.FAILED_ATTEMPT)
+    elif (parcel.state == ParcelState.FAILED_ATTEMPT and event == EventType.DISPATCH and parcel.attempts < MAX_ATTEMPTS):
+        return replace(parcel, attempts=parcel.attempts + 1, state=ParcelState.OUT_FOR_DELIVERY)
+    elif parcel.state == ParcelState.FAILED_ATTEMPT and event == EventType.RETURN:
+        return replace(parcel, state=ParcelState.RETURNED)
     else:
         raise InvalidTransition()
 
