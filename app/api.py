@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
 
     store: dict[str,Parcel]={}
     counter:int=0
+    issued: set[str] = set()
     app=FastAPI(title="Tawseel parcel service", version="0.1.0")
 
     @app.exception_handler(APIError) # for My own Errors
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
               422: {"description": "bad state or limit", "content": {"application/problem+json": {}}},
           })
     def list_parcels(request: Request):
+        nonlocal issued
         q = request.query_params
         errors = []
 
@@ -122,20 +124,21 @@ def create_app() -> FastAPI:
         if errors:
             raise APIError('Value Error', 422, "bad state or limit", errors=errors)
 
-        last_seq = 'pcl_0'
+        last_seq_int = -1
         if "cursor" in q:
-            if q["cursor"] not in [key for key, item in store.items()]:
-                raise APIError('Not Found', 400, "bad cursor")
-            last_seq = q["cursor"]
+            if q["cursor"] not in issued:
+                raise APIError('Bad Request', 400, "bad cursor")
+            last_seq_int = int(q['cursor'].split('_')[1])
 
-        last_seq_int = int(last_seq.split('_')[1])
+
         parcels = []
         next_cursor=None
         for key, item in store.items():
-            if(parcels.length==10):
-                next_cursor=item.id
-                break
             if int(key.split('_')[1]) > last_seq_int and (state is None or state == item.state):
+                if(len(parcels)==limit):
+                    next_cursor=parcels[-1].id
+                    issued.add(next_cursor)
+                    break
                 parcels.append(item)
 
         return {'items':parcels,'next_cursor':next_cursor}
@@ -154,7 +157,9 @@ def create_app() -> FastAPI:
         try:
             for key,item in store.items():
                 if parcel_id==key:
-                    return apply_event(store[parcel_id],body.type)
+                    p=apply_event(store[parcel_id],body.type)
+                    store[parcel_id]=p
+                    return p
         except InvalidTransition:
                 raise APIError('Value Error',409,f"Invalid transition (parcel unchanged)")
 
